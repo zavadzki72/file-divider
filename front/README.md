@@ -103,3 +103,4 @@ O projeto utiliza:
 ## 📝 Licença
 
 © 2025 FileDivider. Todos os direitos reservados.
+© 2025 FileDivider. Todos os direitos reservados.
