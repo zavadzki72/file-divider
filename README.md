@@ -113,5 +113,6 @@ Consulte os READMEs específicos para mais detalhes:
 <div align="center">
 
 © 2025 FileDivider. Todos os direitos reservados.
+© 2025 FileDivider. Todos os direitos reservados.
 
 </div>
