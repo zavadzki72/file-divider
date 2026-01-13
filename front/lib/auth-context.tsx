@@ -16,7 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 })
 
-const API_BASE_URL = "https://filedivider-api-lctjimkxeq-uc.a.run.app/api"
+const API_BASE_URL = "https://fd-api.marccusz.com/api"
 
 // Store auth data with expiration (7 days)
 const storeAuthData = () => {

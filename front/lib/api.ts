@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://filedivider-api-lctjimkxeq-uc.a.run.app/api"
+const API_BASE_URL = "https://fd-api.marccusz.com/api"
 import { saveDownload, updateDownload, generateId, type DownloadItem } from "@/lib/download-manager"
 import { uploadFileInChunks } from "@/lib/upload"
 
