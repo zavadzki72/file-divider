@@ -1,0 +1,661 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Loader2, Upload, FileText, Plus, Minus, CheckCircle, HelpCircle, Download, AlertCircle } from "lucide-react"
+import { processTxt } from "@/lib/api"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { DownloadCenter } from "@/components/download-center"
+import { downloadFile } from "@/lib/download-manager"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+
+export default function TxtPage() {
+  const [file, setFile] = useState<File | null>(null)
+  const [fileName, setFileName] = useState("")
+  const [breakByLines, setBreakByLines] = useState(true)
+  const [numberOfLines, setNumberOfLines] = useState<number>(10)
+  const [numberOfLinesError, setNumberOfLinesError] = useState<string | null>(null)
+  const [extractionHelpers, setExtractionHelpers] = useState<{ key: string; value: string }[]>([
+    { key: "Inicio", value: "" },
+  ])
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processResult, setProcessResult] = useState<string[]>([])
+  const [showResults, setShowResults] = useState(false)
+  const [downloadBlob, setDownloadBlob] = useState<Blob | null>(null)
+  const [downloadFilename, setDownloadFilename] = useState<string>("")
+  const [result, setResult] = useState<{ blobUrl: string | null; downloadFilename: string | null }>({
+    blobUrl: null,
+    downloadFilename: null,
+  })
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
+  const { toast } = useToast()
+  const router = useRouter()
+
+  useEffect(() => {
+    // Adiciona a classe de tema TXT ao body
+    document.body.classList.add("txt-theme")
+
+    // Solicita permissão para notificações
+    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+      Notification.requestPermission()
+    }
+
+    // Limpeza
+    return () => {
+      document.body.classList.remove("txt-theme")
+    }
+  }, [])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      // Valida o tipo de arquivo
+      if (!selectedFile.type.includes("text/plain") && !selectedFile.name.endsWith(".txt")) {
+        toast({
+          title: "Tipo de arquivo inválido",
+          description: "Por favor, envie um arquivo TXT.",
+          variant: "destructive",
+        })
+        e.target.value = ""
+        return
+      }
+
+      setFile(selectedFile)
+      // Não define mais o nome do arquivo automaticamente
+      // Reset results when a new file is selected
+      setProcessResult([])
+      setShowResults(false)
+      setDownloadBlob(null)
+      setDownloadFilename("")
+      setResult({ blobUrl: null, downloadFilename: null })
+    }
+  }
+
+  const addExtractionHelper = () => {
+    setExtractionHelpers([...extractionHelpers, { key: "", value: "" }])
+  }
+
+  const removeExtractionHelper = (index: number) => {
+    // Não permite remover se for o auxiliar "Inicio"
+    if (extractionHelpers[index].key === "Inicio" && extractionHelpers.some((h) => h.key === "Inicio")) {
+      toast({
+        title: "Ação não permitida",
+        description: "O auxiliar 'Inicio' é obrigatório e não pode ser removido.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const newHelpers = [...extractionHelpers]
+    newHelpers.splice(index, 1)
+    setExtractionHelpers(newHelpers.length > 0 ? newHelpers : [{ key: "Inicio", value: "" }])
+  }
+
+  const updateExtractionHelper = (index: number, field: "key" | "value", value: string) => {
+    const newHelpers = [...extractionHelpers]
+
+    // Se estiver tentando mudar a chave "Inicio" para outro valor
+    if (
+      field === "key" &&
+      newHelpers[index].key === "Inicio" &&
+      value !== "Inicio" &&
+      !newHelpers.some((h, i) => i !== index && h.key === "Inicio")
+    ) {
+      toast({
+        title: "Ação não permitida",
+        description: "Pelo menos um auxiliar com a chave 'Inicio' é obrigatório.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    newHelpers[index][field] = value
+    setExtractionHelpers(newHelpers)
+  }
+
+  const handleBreakByLinesChange = (value: string) => {
+    const isBreakByLines = value === "lines"
+    setBreakByLines(isBreakByLines)
+
+    // Se mudar para extração personalizada, garante que tenha o auxiliar "Inicio"
+    if (!isBreakByLines && !extractionHelpers.some((h) => h.key === "Inicio")) {
+      setExtractionHelpers([{ key: "Inicio", value: "" }])
+    }
+  }
+
+  const handleNumberOfLinesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Number.parseInt(e.target.value, 10)
+
+    if (!isNaN(value)) {
+      setNumberOfLines(value)
+
+      // Validação do número de linhas
+      if (value < 10) {
+        setNumberOfLinesError("O número mínimo de linhas é 10.")
+      } else {
+        setNumberOfLinesError(null)
+      }
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!file) {
+      toast({
+        title: "Nenhum arquivo selecionado",
+        description: "Por favor, envie um arquivo TXT.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validação do número de linhas
+    if (breakByLines && numberOfLines < 10) {
+      toast({
+        title: "Número de linhas inválido",
+        description: "O número mínimo de linhas é 10.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Verifica se tem pelo menos um auxiliar com a chave "Inicio" quando não está usando quebra por linhas
+    if (!breakByLines && !extractionHelpers.some((h) => h.key === "Inicio")) {
+      toast({
+        title: "Auxiliar obrigatório",
+        description: "É necessário ter pelo menos um auxiliar com a chave 'Inicio'.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setIsProcessing(true)
+      setShowResults(false)
+      setDownloadBlob(null)
+      setDownloadFilename("")
+      setResult({ blobUrl: null, downloadFilename: null })
+
+      // Converte array de auxiliares de extração para objeto
+      const helpersObject: Record<string, string> = {}
+      if (!breakByLines) {
+        extractionHelpers.forEach((helper) => {
+          if (helper.key && helper.value) {
+            helpersObject[helper.key] = helper.value
+          }
+        })
+      }
+
+      console.log("Enviando requisição com:", {
+        file: file.name,
+        breakByLines,
+        numberOfLines: breakByLines ? numberOfLines : undefined,
+        fileName: fileName || undefined,
+        extractionHelpers: !breakByLines && Object.keys(helpersObject).length > 0 ? helpersObject : undefined,
+      })
+
+      const result = await processTxt(file, {
+        breakByLines,
+        numberOfLines: breakByLines ? numberOfLines : undefined,
+        fileName: fileName || undefined,
+        extractionHelpers: !breakByLines && Object.keys(helpersObject).length > 0 ? helpersObject : undefined,
+      })
+
+      console.log("Resultado do processamento:", result)
+
+      if (result.success) {
+        toast({
+          title: "Sucesso",
+          description: result.message,
+        })
+
+        if (result.files && result.files.length > 0) {
+          setProcessResult(result.files)
+          setShowResults(true)
+
+          // Armazena o blob e o nome do arquivo para download imediato
+          if (result.downloadBlob && result.downloadFilename) {
+            setDownloadBlob(result.downloadBlob)
+            setDownloadFilename(result.downloadFilename)
+          }
+
+          // Armazena o blob e o nome do arquivo para download imediato
+          if (result.blobUrl && result.downloadFilename) {
+            setResult({ blobUrl: result.blobUrl, downloadFilename: result.downloadFilename })
+          }
+        }
+      } else {
+        toast({
+          title: "Erro",
+          description: result.message || "Falha ao processar arquivo TXT.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Falha ao processar TXT:", error)
+      toast({
+        title: "Erro",
+        description:
+          error instanceof Error ? error.message : "Falha ao processar arquivo TXT. Por favor, tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // Função para realizar o download manualmente
+  const handleDownload = () => {
+    if (!result.blobUrl) {
+      toast({
+        title: "Erro",
+        description: "URL de download não disponível.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      downloadFile(result.blobUrl, result.downloadFilename || "arquivo.zip")
+
+      toast({
+        title: "Download iniciado",
+        description: "O arquivo está sendo baixado.",
+      })
+    } catch (error) {
+      console.error("Erro ao baixar arquivo:", error)
+
+      toast({
+        title: "Erro ao baixar",
+        description: "Ocorreu um erro ao tentar baixar o arquivo.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  return (
+    <div className="flex flex-col min-h-[calc(100vh-4rem)]">
+      {/* Hero Section */}
+      <section className="w-full py-8 md:py-10 bg-gradient-to-r from-blue-50 to-blue-100 border-b">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-row items-center justify-between">
+            <div className="space-y-2 max-w-[60%]">
+              <h1 className="text-2xl font-bold tracking-tighter sm:text-3xl md:text-4xl">
+                Processamento de Arquivos TXT
+              </h1>
+              <p className="text-gray-500 md:text-lg">Envie seus arquivos TXT e organize-os com nosso sistema.</p>
+            </div>
+            <div className="hidden md:flex items-center justify-center">
+              <img
+                src="/images/txt-illustration.png"
+                alt="Processamento de TXT"
+                className="h-40 w-auto object-contain"
+                style={{ mixBlendMode: "multiply" }}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Content */}
+      <div className="container py-12 px-4 md:px-6">
+        <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
+          <div className="space-y-6">
+            <Card className="border-gray-200 shadow-sm">
+              <CardHeader className="bg-white border-b border-gray-100">
+                <CardTitle className="flex items-center text-xl">
+                  <FileText className="h-5 w-5 mr-2 text-txt" />
+                  Enviar Arquivo TXT
+                </CardTitle>
+                <CardDescription>Envie um arquivo TXT para processar e organizar seu conteúdo.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <form onSubmit={handleSubmit}>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="file">Arquivo TXT</Label>
+                      <div
+                        className="flex items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-dashed rounded-md appearance-none cursor-pointer hover:border-primary focus:outline-none"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <input
+                          id="file"
+                          type="file"
+                          className="hidden"
+                          accept=".txt,text/plain"
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                        />
+                        {file ? (
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-8 h-8 text-primary" />
+                            <span className="font-medium text-gray-600">{file.name}</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center">
+                            <Upload className="w-8 h-8 text-gray-400" />
+                            <span className="mt-2 text-base text-gray-500">Clique para enviar ou arraste e solte</span>
+                            <span className="text-sm text-gray-400">Apenas arquivos TXT</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Método de Processamento</Label>
+                      <RadioGroup
+                        value={breakByLines ? "lines" : "custom"}
+                        onValueChange={handleBreakByLinesChange}
+                        className="flex flex-col space-y-2"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="lines" id="lines" />
+                          <Label htmlFor="lines" className="cursor-pointer">
+                            Quebrar por linhas
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="custom" id="custom" />
+                          <Label htmlFor="custom" className="cursor-pointer">
+                            Extração personalizada
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
+                    {breakByLines && (
+                      <div className="space-y-2">
+                        <Label htmlFor="numberOfLines">Número de Linhas</Label>
+                        <Input
+                          id="numberOfLines"
+                          type="number"
+                          min="10"
+                          value={numberOfLines}
+                          onChange={handleNumberOfLinesChange}
+                          className={`w-full ${numberOfLinesError ? "border-red-500" : ""}`}
+                        />
+                        {numberOfLinesError && (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>{numberOfLinesError}</AlertDescription>
+                          </Alert>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Defina o número de linhas para cada seção do arquivo. Mínimo: 10 linhas.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="fileName">Nome do Arquivo</Label>
+                      <Input
+                        id="fileName"
+                        value={fileName}
+                        onChange={(e) => setFileName(e.target.value)}
+                        placeholder="Digite o nome do arquivo (ex: arquivo_{chave1}_{chave2})"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Você pode usar chaves como {"{chave1}"} para inserir valores dos auxiliares de extração.
+                      </p>
+                    </div>
+
+                    {!breakByLines && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Auxiliares de Extração</Label>
+                          <Button type="button" variant="outline" size="sm" onClick={addExtractionHelper}>
+                            <Plus className="w-4 h-4 mr-1" />
+                            Adicionar
+                          </Button>
+                        </div>
+
+                        {extractionHelpers.map((helper, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Input
+                              value={helper.key}
+                              onChange={(e) => updateExtractionHelper(index, "key", e.target.value)}
+                              placeholder="Chave"
+                              className="flex-1"
+                              disabled={helper.key === "Inicio"}
+                            />
+                            <Input
+                              value={helper.value}
+                              onChange={(e) => updateExtractionHelper(index, "value", e.target.value)}
+                              placeholder="Valor (expressão regular)"
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeExtractionHelper(index)}
+                              disabled={extractionHelpers.length === 1 || helper.key === "Inicio"}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+
+                        <Accordion type="single" collapsible className="mt-4">
+                          <AccordionItem value="regex-help">
+                            <AccordionTrigger className="text-sm font-medium flex items-center">
+                              <HelpCircle className="h-4 w-4 mr-2" />
+                              Ajuda com Expressões Regulares
+                            </AccordionTrigger>
+                            <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                              <p>
+                                Expressões regulares (regex) são padrões utilizados para encontrar combinações de
+                                caracteres em textos. Aqui estão alguns exemplos úteis:
+                              </p>
+                              <ul className="list-disc pl-5 space-y-1">
+                                <li>
+                                  <strong>^</strong> - Início da linha
+                                </li>
+                                <li>
+                                  <strong>$</strong> - Fim da linha
+                                </li>
+                                <li>
+                                  <strong>\d</strong> - Qualquer dígito (0-9)
+                                </li>
+                                <li>
+                                  <strong>\w</strong> - Qualquer caractere alfanumérico
+                                </li>
+                                <li>
+                                  <strong>.*</strong> - Qualquer caractere, qualquer quantidade
+                                </li>
+                                <li>
+                                  <strong>[A-Z]</strong> - Qualquer letra maiúscula
+                                </li>
+                                <li>
+                                  <strong>\s</strong> - Espaço em branco
+                                </li>
+                              </ul>
+                              <p className="mt-2">
+                                <strong>Exemplo:</strong> Para capturar um CPF, use:{" "}
+                                <code>
+                                  \d{3}\.\d{3}\.\d{3}-\d{2}
+                                </code>
+                              </p>
+                              <p>
+                                <strong>Dica:</strong> O auxiliar <strong>Inicio</strong> é obrigatório e deve conter
+                                uma expressão que identifique onde começa cada seção a ser extraída.
+                              </p>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6">
+                    <Button
+                      type="submit"
+                      disabled={!file || isProcessing || (breakByLines && numberOfLines < 10)}
+                      className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:opacity-90 text-white border-0"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Processar TXT
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {showResults && processResult.length > 0 && (
+              <Card ref={resultRef} className="border-primary shadow-sm">
+                <CardHeader className="bg-primary/10">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-primary" />
+                    <CardTitle>Resultados do Processamento</CardTitle>
+                  </div>
+                  <CardDescription>Seu TXT foi processado com sucesso.</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="space-y-2">
+                    <p className="font-medium">Arquivos Gerados:</p>
+                    <ul className="space-y-1 pl-5 list-disc">
+                      {processResult.map((file, index) => (
+                        <li key={index} className="text-sm">
+                          {file}
+                        </li>
+                      ))}
+                    </ul>
+                    {result.blobUrl && result.downloadFilename && (
+                      <Button onClick={handleDownload} className="w-full mt-4" variant="outline">
+                        <Download className="w-4 h-4 mr-2" />
+                        Baixar Arquivos
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <Card className="border-gray-200 shadow-sm">
+              <CardHeader className="bg-white border-b border-gray-100">
+                <CardTitle className="text-xl">Como Usar</CardTitle>
+                <CardDescription>Siga estes passos para processar seus arquivos TXT.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold">
+                      1
+                    </div>
+                    <p className="font-medium">Envie um arquivo TXT</p>
+                  </div>
+                  <p className="text-sm text-gray-500 pl-8">
+                    Clique na área de upload para selecionar um arquivo TXT do seu computador.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold">
+                      2
+                    </div>
+                    <p className="font-medium">Escolha um método de processamento</p>
+                  </div>
+                  <p className="text-sm text-gray-500 pl-8">
+                    Selecione "Quebrar por linhas" para dividir o arquivo por quebras de linha, ou "Extração
+                    personalizada" para usar expressões regulares.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold">
+                      3
+                    </div>
+                    <p className="font-medium">Defina o número de linhas</p>
+                  </div>
+                  <p className="text-sm text-gray-500 pl-8">
+                    Se escolher "Quebrar por linhas", defina quantas linhas cada seção do arquivo deve ter (mínimo: 10
+                    linhas).
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold">
+                      4
+                    </div>
+                    <p className="font-medium">Defina o nome do arquivo</p>
+                  </div>
+                  <p className="text-sm text-gray-500 pl-8">
+                    Digite o nome para os arquivos gerados. Você pode usar chaves para inserir valores dos auxiliares de
+                    extração, como: arquivo_{"{chave1}"}_{"{chave2}"}.
+                  </p>
+                </div>
+
+                {!breakByLines && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold">
+                        5
+                      </div>
+                      <p className="font-medium">Configure expressões regulares</p>
+                    </div>
+                    <p className="text-sm text-gray-500 pl-8">
+                      Para extração personalizada, defina expressões regulares para extrair informações. O auxiliar
+                      "Inicio" é obrigatório e define onde cada seção começa.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold">
+                      {!breakByLines ? "6" : "5"}
+                    </div>
+                    <p className="font-medium">Processe seu arquivo</p>
+                  </div>
+                  <p className="text-sm text-gray-500 pl-8">
+                    Clique no botão "Processar TXT" para iniciar o processamento do seu arquivo.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold">
+                      {!breakByLines ? "7" : "6"}
+                    </div>
+                    <p className="font-medium">Faça o download imediatamente</p>
+                  </div>
+                  <p className="text-sm text-gray-500 pl-8">
+                    <strong>Importante:</strong> Faça o download do arquivo imediatamente após o processamento. Os
+                    arquivos não são armazenados localmente.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <DownloadCenter />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
