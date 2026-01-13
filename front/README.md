@@ -1,79 +1,105 @@
-# [FileDivider](https://fd.marccusz.com)
+# FileDivider - Frontend
 
-<div align="center">
-  <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-PkF6u6yYJG3sisD4AQDsl7APilxiXI.png" alt="FileDivider Banner" width="100%" />
-</div>
+Interface web moderna para processamento e divisão inteligente de arquivos PDF e TXT.
 
-## Sobre o Projeto
+🌐 **Acesse em:** [fd.marccusz.com](https://fd.marccusz.com)
 
-O FileDivider é uma ferramenta online que permite dividir e organizar arquivos PDF e TXT de forma inteligente. Utilizando expressões regulares ou métodos predefinidos, o sistema facilita a extração e organização de informações de documentos, tornando o processo de divisão de arquivos simples e eficiente.
+## 🛠 Stack Tecnológica
 
-## Funcionalidades
+| Tecnologia | Versão | Descrição |
+|------------|--------|-----------|
+| Next.js | 15.2.4 | Framework React para produção |
+| React | 19 | Biblioteca de UI |
+| TypeScript | 5 | Superset tipado do JavaScript |
+| TailwindCSS | 3.4.17 | Framework CSS utility-first |
+| pnpm | - | Gerenciador de pacotes |
 
-### Processamento de Arquivos PDF
-- Divisão de PDFs com base em expressões regulares
-- Utilização de templates predefinidos
-- Extração personalizada de informações
-- Processamento rápido e eficiente
+### Bibliotecas de UI
 
-### Processamento de Arquivos TXT
-- Quebra por número de linhas (mínimo 10 linhas)
-- Extração personalizada com expressões regulares
-- Organização inteligente do conteúdo
+- **Radix UI** - Componentes acessíveis e sem estilo
+- **Lucide React** - Ícones modernos
+- **Sonner** - Notificações toast
+- **Recharts** - Gráficos e visualizações
+- **React Hook Form + Zod** - Formulários e validação
+- **next-themes** - Suporte a temas (dark/light mode)
 
-### Central de Downloads
-- Gerenciamento de arquivos processados
-- Acompanhamento do status de processamento
-- Download imediato dos arquivos processados
+### Componentes Radix UI Utilizados
 
-## Como Usar
+Accordion • Alert Dialog • Avatar • Checkbox • Dialog • Dropdown Menu • Navigation Menu • Popover • Progress • Select • Tabs • Toast • Tooltip
 
-### Para Processar Arquivos PDF
+## 📁 Estrutura do Projeto
 
-1. Acesse a página de processamento de PDF clicando em "Processar PDF" no menu principal
-2. Faça upload do seu arquivo PDF (tamanho máximo: 10MB)
-3. Escolha o método de processamento:
-   - **Usar um template existente**: Selecione um template predefinido da lista
-   - **Configurar expressões regulares personalizadas**: Configure o auxiliar "Início" com uma expressão regular que identifique onde cada seção começa
-4. Defina o nome do arquivo de saída (você pode usar chaves como {chave1} para inserir valores dos auxiliares)
-5. Clique em "Processar PDF"
-6. Aguarde o processamento e faça o download dos arquivos resultantes
+```
+front/
+├── app/               # Páginas e rotas (App Router)
+├── components/        # Componentes reutilizáveis
+│   └── ui/           # Componentes de interface
+├── hooks/            # Custom hooks
+├── lib/              # Utilitários e configurações
+├── public/           # Arquivos estáticos
+├── styles/           # Estilos globais
+└── types/            # Definições de tipos TypeScript
+```
 
-### Para Processar Arquivos TXT
+## 🚀 Como Executar
 
-1. Acesse a página de processamento de TXT clicando em "Processar TXT" no menu principal
-2. Faça upload do seu arquivo TXT (tamanho máximo: 10MB)
-3. Escolha o método de processamento:
-   - **Quebrar por linhas**: Define o número de linhas por arquivo (mínimo 10 linhas)
-   - **Extração personalizada**: Configure expressões regulares para identificar seções
-4. Defina o nome do arquivo de saída
-5. Clique em "Processar TXT"
-6. Aguarde o processamento e faça o download dos arquivos resultantes
+### Pré-requisitos
 
-## Dicas Importantes
+- [Node.js 18+](https://nodejs.org/)
+- [pnpm](https://pnpm.io/)
 
-- Os arquivos não são armazenados permanentemente. Faça o download imediatamente após o processamento.
-- Para arquivos maiores que 10MB, considere dividi-los em partes menores antes de fazer o upload.
-- Utilize expressões regulares precisas para obter melhores resultados na divisão personalizada.
-- Verifique a seção de Ajuda e Tutoriais para exemplos detalhados de uso.
+### Instalação
 
-## Suporte
+```bash
+# Instalar dependências
+pnpm install
 
-Se precisar de ajuda ou tiver dúvidas:
-- Consulte a seção de [FAQ](https://fd.marccusz.com/help/faq)
-- Acesse o [Centro de Ajuda](https://fd.marccusz.com/help)
+# Executar em modo desenvolvimento
+pnpm dev
 
-## Tecnologias Utilizadas
+# Build para produção
+pnpm build
 
-- Frontend: Next.js, React, Tailwind CSS
-- Backend: .NET Core
-- Processamento de arquivos: Bibliotecas especializadas para manipulação de PDF e TXT
+# Executar build de produção
+pnpm start
+```
 
-## Contato
+A aplicação estará disponível em `http://localhost:3000`.
 
-- Site: [https://marccusz.com](https://marccusz.com)
-- GitHub: [https://github.com/zavadzki72](https://github.com/zavadzki72)
+## 🔧 Scripts Disponíveis
 
----
+| Comando | Descrição |
+|---------|-----------|
+| `pnpm dev` | Inicia servidor de desenvolvimento |
+| `pnpm build` | Gera build de produção |
+| `pnpm start` | Executa build de produção |
+| `pnpm lint` | Executa linter |
+
+## 🎨 Design System
+
+O projeto utiliza:
+
+- **TailwindCSS** para estilos utilitários
+- **CSS Variables** para temas dinâmicos
+- **Radix UI** para componentes acessíveis
+- **Animações** via `tailwindcss-animate`
+
+## 📱 Funcionalidades
+
+- ✅ Processamento de arquivos PDF com regex
+- ✅ Processamento de arquivos TXT
+- ✅ Sistema de templates predefinidos
+- ✅ Central de downloads
+- ✅ Design responsivo
+- ✅ Modo escuro/claro
+- ✅ Interface acessível
+
+## 🔗 Links
+
+- [Produção](https://fd.marccusz.com)
+- [FAQ](https://fd.marccusz.com/help/faq)
+- [Centro de Ajuda](https://fd.marccusz.com/help)
+
+## 📝 Licença
 
 © 2025 FileDivider. Todos os direitos reservados.
