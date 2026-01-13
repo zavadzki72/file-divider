@@ -100,3 +100,4 @@ docker run -p 80:80 -e MongoDbConnectionString="sua-connection-string" filedivid
 ## 📝 Licença
 
 © 2025 FileDivider. Todos os direitos reservados.
+© 2025 FileDivider. Todos os direitos reservados.
