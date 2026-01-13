@@ -103,7 +103,7 @@ Consulte os READMEs específicos para mais detalhes:
 
 ## 👤 Autor
 
-**Marcus Vinicius**
+**Marccus Zavadzki**
 
 - Website: [marccusz.com](https://marccusz.com)
 - GitHub: [@zavadzki72](https://github.com/zavadzki72)
